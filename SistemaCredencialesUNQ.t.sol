@@ -1,104 +1,130 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-// Importaciones directas compatibles con Remix
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "forge-std/Test.sol";
+import "../src/SistemaCredencialesUNQ.sol";
+import "@openzeppelin/contracts/access/IAccessControl.sol";
 
-contract SistemaCredencialesUNQ is ERC721URIStorage, AccessControl {
-    uint256 private _nextTokenId;
+contract SistemaCredencialesUNQTest is Test {
+    SistemaCredencialesUNQ public sistema;
 
-    // Roles Institucionales
-    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    // Cuentas para simular actores institucionales
+    address public rector = address(0x1);
+    address public decano = address(0x2);
+    address public alumno = address(0x3);
+    address public intruso = address(0x4);
 
-    // 3. Struct Credential extendido para Privacidad
-    struct Credential {
-        string degreeName;       // Ej: "Licenciatura en Sistemas"
-        bytes32 studentNameHash; // keccak256(nombre + DNI)
-        uint256 issueDate;       // Timestamp inmutable
-        bytes32 documentHash;    // keccak256 del PDF original
-        bool active;             // Estado de validez
+    // Datos de prueba con hashing para privacidad (Commitment Scheme) [5-7]
+    bytes32 public studentHash = keccak256(abi.encodePacked("Juan Perez", "12345678"));
+    bytes32 public docHash = keccak256(abi.encodePacked("PDF_TITULO_ORIGINAL"));
+    string public uri = "ipfs://bafybeic...metadata.json";
+
+    function setUp() public {
+        // Despliegue inicial: el Rector es el DEFAULT_ADMIN_ROLE [4]
+        sistema = new SistemaCredencialesUNQ(rector);
     }
 
-    mapping(uint256 => Credential) public credentials;
+    // --- 1. CAMINO FELIZ (Happy Path) ---
 
-    // Eventos para auditoría y frontend
-    event CredentialIssued(address indexed student, uint256 indexed tokenId, string degreeName, bytes32 studentNameHash);
-    event CredentialRevoked(uint256 indexed tokenId, address indexed by, string reason);
-    event IssuerGranted(address indexed account, address indexed by);
-    event IssuerRevoked(address indexed account, address indexed by);
-
-    constructor(address rector) ERC721("Diplomatura UNQ", "DUNQ") {
-        _grantRole(DEFAULT_ADMIN_ROLE, rector); // Rector gestiona emisores
-        _grantRole(ISSUER_ROLE, rector);        // Rector también puede emitir inicialmente
+    function test_AdminAgregaIssuerYVerificaRol() public {
+        vm.prank(rector); // Cheatcode para simular la cuenta del rector [8]
+        sistema.grantIssuer(decano);
+        
+        assertTrue(sistema.hasRole(sistema.ISSUER_ROLE(), decano));
     }
 
-    // --- Gestión de Emisores (Sólo Admin) ---
-    function grantIssuer(address account) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(ISSUER_ROLE, account);
-        emit IssuerGranted(account, msg.sender);
+    function test_IssuerEmiteYGuardaDatosCorrectamente() public {
+        vm.prank(rector);
+        sistema.grantIssuer(decano);
+
+        vm.prank(decano);
+        uint256 tokenId = sistema.issueCredential(alumno, "Licenciatura en Sistemas", studentHash, docHash, uri);
+
+        (SistemaCredencialesUNQ.Credential memory cred, bool isValid) = sistema.verify(tokenId);
+
+        assertEq(cred.degreeName, "Licenciatura en Sistemas");
+        assertEq(cred.studentNameHash, studentHash);
+        assertEq(cred.documentHash, docHash);
+        assertTrue(isValid);
+        assertEq(sistema.ownerOf(tokenId), alumno);
     }
 
-    function revokeIssuer(address account) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _revokeRole(ISSUER_ROLE, account);
-        emit IssuerRevoked(account, msg.sender);
+    function test_IssuerRevocaYVerificacionFalla() public {
+        vm.prank(rector);
+        sistema.grantIssuer(decano);
+        vm.prank(decano);
+        uint256 tokenId = sistema.issueCredential(alumno, "Ingenieria", studentHash, docHash, uri);
+
+        vm.prank(decano);
+        sistema.revoke(tokenId, "Error en carga de datos");
+
+        (, bool isValid) = sistema.verify(tokenId);
+        assertFalse(isValid);
     }
 
-    // --- Ciclo de Vida de la Credencial (Sólo Issuers) ---
-    function issueCredential(
-        address student,
-        string memory degreeName,
-        bytes32 studentNameHash,
-        bytes32 documentHash,
-        string memory metadataURI
-    ) public onlyRole(ISSUER_ROLE) returns (uint256) {
-        uint256 tokenId = _nextTokenId++;
+    // --- 2. CASOS DE ERROR ---
 
-        credentials[tokenId] = Credential({
-            degreeName: degreeName,
-            studentNameHash: studentNameHash,
-            issueDate: block.timestamp,
-            documentHash: documentHash,
-            active: true
-        });
-
-        _safeMint(student, tokenId);
-        _setTokenURI(tokenId, metadataURI);
-
-        emit CredentialIssued(student, tokenId, degreeName, studentNameHash);
-        return tokenId;
+    function test_RevertirEmisionSinIssuerRole() public {
+        vm.prank(intruso);
+        // Espera el error de AccessControl de OpenZeppelin v5 [4]
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, 
+                intruso, 
+                sistema.ISSUER_ROLE()
+            )
+        );
+        sistema.issueCredential(alumno, "Fraude", studentHash, docHash, uri);
     }
 
-    function revoke(uint256 tokenId, string memory reason) public onlyRole(ISSUER_ROLE) {
-        require(_ownerOf(tokenId) != address(0), "La credencial no existe");
-        credentials[tokenId].active = false;
-        emit CredentialRevoked(tokenId, msg.sender, reason);
+    function test_RevertirTransferenciaSoulbound() public {
+        vm.prank(rector);
+        sistema.grantIssuer(decano);
+        vm.prank(decano);
+        uint256 id = sistema.issueCredential(alumno, "Titulo SBT", studentHash, docHash, uri);
+
+        vm.prank(alumno);
+        vm.expectRevert("Soulbound: Las credenciales son intransferibles");
+        sistema.transferFrom(alumno, intruso, id);
     }
 
-    // --- Verificación Pública ---
-    function verify(uint256 tokenId) public view returns (Credential memory, bool isValid) {
-        Credential memory cred = credentials[tokenId];
-        bool exists = _ownerOf(tokenId) != address(0);
-        return (cred, exists && cred.active);
+    function test_RevertirRevocacionInexistente() public {
+        vm.prank(rector);
+        sistema.grantIssuer(decano);
+        
+        vm.prank(decano);
+        vm.expectRevert("Credencial inexistente");
+        sistema.revoke(999, "No existe");
     }
 
-    // --- 2. Lógica Soulbound (NFT No Transferible) ---
-    function _update(address to, uint256 tokenId, address auth)
-        internal override returns (address)
-    {
-        address from = _ownerOf(tokenId);
-        // Bloquea transferencias entre cuentas (solo permite minting y burning)
-        if (from != address(0) && to != address(0)) {
-            revert("Soulbound: Las credenciales son intransferibles");
-        }
-        return super._update(to, tokenId, auth);
+    function test_RevertirGestionIssuerSinAdminRole() public {
+        vm.prank(decano);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, 
+                decano, 
+                0x00 // DEFAULT_ADMIN_ROLE
+            )
+        );
+        sistema.grantIssuer(intruso);
     }
 
-    // Soporte para interfaces de OpenZeppelin
-    function supportsInterface(bytes4 interfaceId)
-        public view override(ERC721URIStorage, AccessControl)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
+    // --- 3. FUZZ TESTING ---
+
+    /**
+     * @dev Fuzz test para verificar que el dueño siempre sea el estudiante asignado.
+     * Foundry ejecutará esto con cientos de combinaciones aleatorias [8, 9].
+     */
+    function testFuzz_issueCredential(address student, string memory metadataURI) public {
+        // Regla: el estudiante no puede ser la dirección cero
+        vm.assume(student != address(0)); 
+        
+        vm.prank(rector);
+        sistema.grantIssuer(decano);
+
+        vm.prank(decano);
+        uint256 id = sistema.issueCredential(student, "Carrera Fuzz", studentHash, docHash, metadataURI);
+
+        assertEq(sistema.ownerOf(id), student);
     }
 }
