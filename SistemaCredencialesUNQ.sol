@@ -16,18 +16,36 @@ contract SistemaCredencialesUNQ is ERC721URIStorage, AccessControl {
     }
 
     /**
-     * @dev Ahora la variable _nextTokenId existe y se puede incrementar.
+     * @dev Emisión de credenciales restringida a cuentas con ISSUER_ROLE.
      */
     function emitirCredencial(address graduado, string memory uri) 
         public 
         onlyRole(ISSUER_ROLE) 
     {
-        uint256 tokenId = _nextTokenId++; // Se incrementa el ID para la próxima emisión
+        uint256 tokenId = _nextTokenId++;
         _safeMint(graduado, tokenId);
         _setTokenURI(tokenId, uri);
     }
 
-    // Soporte para AccessControl y ERC721
+    /**
+     * @dev 2. Lógica Soulbound (no transferible)
+     * Se sobrescribe _update para revertir cualquier intento de transferencia 
+     * entre direcciones que no sean la dirección cero (mint/burn).
+     */
+    function _update(address to, uint256 tokenId, address auth)
+        internal 
+        override 
+        returns (address)
+    {
+        address from = _ownerOf(tokenId);
+        // Si no es un minteo (from == 0) ni un quemado (to == 0), es una transferencia
+        if (from != address(0) && to != address(0)) {
+            revert("Soulbound: las credenciales academicas no son transferibles");
+        }
+        return super._update(to, tokenId, auth);
+    }
+
+    // Funciones de soporte requeridas por Solidity para herencia múltiple
     function supportsInterface(bytes4 interfaceId)
         public
         view
