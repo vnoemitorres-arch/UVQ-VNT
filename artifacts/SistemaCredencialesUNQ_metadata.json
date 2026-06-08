@@ -388,6 +388,45 @@
 			{
 				"inputs": [
 					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "credentials",
+				"outputs": [
+					{
+						"internalType": "string",
+						"name": "degreeName",
+						"type": "string"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "studentNameHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "uint256",
+						"name": "issueDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "documentHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bool",
+						"name": "active",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
 						"internalType": "address",
 						"name": "graduado",
 						"type": "address"
@@ -396,6 +435,21 @@
 						"internalType": "string",
 						"name": "uri",
 						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "degreeName",
+						"type": "string"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "studentNameHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "documentHash",
+						"type": "bytes32"
 					}
 				],
 				"name": "emitirCredencial",
@@ -553,6 +607,19 @@
 					}
 				],
 				"name": "renounceRole",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "revocarCredencial",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -833,8 +900,8 @@
 				"balanceOf(address)": {
 					"details": "Returns the number of tokens in ``owner``'s account."
 				},
-				"emitirCredencial(address,string)": {
-					"details": "Emisión de credenciales restringida a cuentas con ISSUER_ROLE."
+				"emitirCredencial(address,string,string,bytes32,bytes32)": {
+					"details": "Emisión de credencial con el struct extendido."
 				},
 				"getApproved(uint256)": {
 					"details": "Returns the account approved for `tokenId` token. Requirements: - `tokenId` must exist."
@@ -859,6 +926,9 @@
 				},
 				"renounceRole(bytes32,address)": {
 					"details": "Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event."
+				},
+				"revocarCredencial(uint256)": {
+					"details": "Permite a un emisor revocar una credencial si fuera necesario."
 				},
 				"revokeRole(bytes32,address)": {
 					"details": "Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event."
@@ -1075,11 +1145,11 @@
 			]
 		},
 		"SistemaCredencialesUNQ.sol": {
-			"keccak256": "0x0fcd111076508b052a6a7bedb5aa99d82862a7fc10e028d3dd2b9f608ed09d59",
+			"keccak256": "0x21bdd1801c8bdae4a16e1ba95962d34730301fef12f20859e50292f69a244d0c",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://2571458c2253bef6b3b9c300d3e324004bd1afb7a6bdbf7246e6c6c75d325adb",
-				"dweb:/ipfs/QmPpHm2hM4hdMANRkshk3LZk1fUKyjYGC4cTDgZJcRQ2n2"
+				"bzz-raw://23d4798b38393dda322e49d9e2620aca6c599b502c83d0c42fd5c629b59dde5f",
+				"dweb:/ipfs/QmUMphvSeQDSbYEPMt9QCXfpDScMSTWa6qRGFQ2Ds9mSG4"
 			]
 		}
 	},
