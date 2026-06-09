@@ -43,5 +43,14 @@
   "@openzeppelin/contracts@5.0.0/interfaces/IERC721.sol": ".deps/npm/@openzeppelin/contracts@5.0.0/interfaces/IERC721.sol",
   "@openzeppelin/contracts@5.0.0/access/IAccessControl.sol": ".deps/npm/@openzeppelin/contracts@5.0.0/access/IAccessControl.sol",
   "@openzeppelin/contracts@5.0.0/interfaces/IERC4906.sol": ".deps/npm/@openzeppelin/contracts@5.0.0/interfaces/IERC4906.sol",
-  "@openzeppelin/contracts@/access/IAccessControl.sol": ".deps/npm/@openzeppelin/contracts@/access/IAccessControl.sol"
+  "@openzeppelin/contracts@/access/IAccessControl.sol": ".deps/npm/@openzeppelin/contracts@/access/IAccessControl.sol",
+  "sr@1.0.4/SistemaCredencialesUNQ.sol": ".deps/npm/sr@1.0.4/SistemaCredencialesUNQ.sol",
+  "@openzeppelin/contracts@5.0.0/access/AccessControl.sol": ".deps/npm/@openzeppelin/contracts@5.0.0/access/AccessControl.sol",
+  "@openzeppelin/contracts@5/access/AccessControl.sol": ".deps/npm/@openzeppelin/contracts@5/access/AccessControl.sol",
+  "@openzeppelin/contracts@/access/AccessControl.sol": ".deps/npm/@openzeppelin/contracts@/access/AccessControl.sol",
+  "@openzeppelin/contracts@5/access/IAccessControl.sol": ".deps/npm/@openzeppelin/contracts@5/access/IAccessControl.sol",
+  "@openzeppelin/contracts@5/utils/Context.sol": ".deps/npm/@openzeppelin/contracts@5/utils/Context.sol",
+  "@openzeppelin/contracts@5/utils/introspection/ERC165.sol": ".deps/npm/@openzeppelin/contracts@5/utils/introspection/ERC165.sol",
+  "@openzeppelin/contracts@5/utils/introspection/IERC165.sol": ".deps/npm/@openzeppelin/contracts@5/utils/introspection/IERC165.sol",
+  "s@1.0.0/SistemaCredencialesUNQ.sol": ".deps/npm/s@1.0.0/SistemaCredencialesUNQ.sol"
 }
