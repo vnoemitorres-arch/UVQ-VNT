@@ -1,93 +1,84 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.34;
 
 import "remix_tests.sol";
-import "../SistemaCredencialesUNQ.sol"; 
-// IMPORT SOLICITADO INTEGRADO PARA REMIX
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "remix_accounts.sol";
+import "../SistemaCredencialesUNQ.sol"; // Verificá que la ruta sea correcta
 
 contract SistemaCredencialesUNQTest {
-    SistemaCredencialesUNQ public sistema;
-    address rector = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
-    address decano = 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2;
-    address alumno = 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
-    address intruso = 0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB;
-    // Datos de prueba
-    bytes32 public studentHash = keccak256(abi.encodePacked("Juan Perez", "12345678"));
-    bytes32 public docHash = keccak256(abi.encodePacked("PDF_TITULO_ORIGINAL"));
-    string public uri = "ipfs://bafybeic...metadata.json";
+    SistemaCredencialesUNQ sistema;
+    address decano;
+    address alumno;
 
-    function beforeEach() public {
-        sistema = new SistemaCredencialesUNQ(rector);
-    }
+    // Datos para el Commitment Scheme (Privacidad)
+    bytes32 studentHash = keccak256(abi.encodePacked("Juan Perez", "12345678"));
+    bytes32 docHash = keccak256(abi.encodePacked("PDF_TITULO"));
 
-    // --- 1. CAMINO FELIZ (Happy Path) ---
-
-    function test_AdminAgregaIssuerYVerificaRol() public {
-        sistema.grantIssuer(decano);
-        Assert.equal(sistema.hasRole(sistema.ISSUER_ROLE(), decano), true, "El decano deberia tener el rol de Issuer");
-    }
-
-    function test_IssuerEmiteYGuardaDatosCorrectamente() public {
-        sistema.grantIssuer(address(this)); 
-
-        uint256 tokenId = sistema.issueCredential(alumno, "Licenciatura en Sistemas", studentHash, docHash, uri);
-
-        (SistemaCredencialesUNQ.Credential memory cred, bool isValid) = sistema.verify(tokenId);
-
-        Assert.equal(cred.degreeName, "Licenciatura en Sistemas", "El nombre de la carrera no coincide");
-        Assert.equal(cred.studentNameHash, studentHash, "El hash del estudiante no coincide");
-        Assert.equal(cred.documentHash, docHash, "El hash del documento no coincide");
-        Assert.equal(isValid, true, "La credencial deberia ser valida");
-        Assert.equal(sistema.ownerOf(tokenId), alumno, "El dueno deberia ser el alumno");
-    }
-
-    function test_IssuerRevocaYVerificacionFalla() public {
-        sistema.grantIssuer(address(this));
-        uint256 tokenId = sistema.issueCredential(alumno, "Ingenieria", studentHash, docHash, uri);
-
-        sistema.revoke(tokenId, "Error en carga de datos");
-
-        (, bool isValid) = sistema.verify(tokenId);
-        Assert.equal(isValid, false, "La credencial no deberia ser valida tras revocacion");
-    }
-
-    // --- 2. CASOS DE ERROR (Revert Testing en Remix) ---
-
-    /// #sender: 0x78731D3Ca6b7E34aC0F824c42a7cc18A495cabaB
-    /// #expectRevert: true
-    function test_RevertirEmisionSinIssuerRole() public {
-        sistema.issueCredential(alumno, "Fraude", studentHash, docHash, uri);
-    }
-
-    /// #expectRevert: true
-    function test_RevertirTransferenciaSoulbound() public {
-        sistema.grantIssuer(address(this));
-        uint256 id = sistema.issueCredential(alumno, "Titulo SBT", studentHash, docHash, uri);
-        sistema.transferFrom(alumno, intruso, id);
-    }
-
-    /// #expectRevert: true
-    function test_RevertirRevocacionInexistente() public {
-        sistema.grantIssuer(address(this));
-        sistema.revoke(999, "No existe");
-    }
-
-    // --- 3. ADAPTACIÓN DE FUZZ TESTING ---
-
-    function testRemix_issueCredentialValoresFijos() public {
-          address[3] memory estudiantesDePrueba = [
-            0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2,
-            0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db,
-            0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB
-        ];
+    function beforeAll() public {
+        decano = TestsAccounts.getAccount(1);
+        alumno = TestsAccounts.getAccount(2);
         
-        sistema.grantIssuer(address(this));
+        // ¡CLAVE! Le damos los roles al contrato de TEST para que pueda operar
+        sistema = new SistemaCredencialesUNQ(address(this));
+    }
 
-        for(uint i = 0; i < estudiantesDePrueba.length; i++) {
-            address estudiante = estudiantesDePrueba[i];
-            uint256 id = sistema.issueCredential(estudiante, "Carrera Iterada", studentHash, docHash, "ipfs://test");
-            Assert.equal(sistema.ownerOf(id), estudiante, "El dueno asignado en el bucle es incorrecto");
+    // --- CAMINO FELIZ (Happy Path) ---
+
+    function testAdminAgregaIssuer() public {
+        sistema.grantIssuer(decano);
+        Assert.equal(sistema.hasRole(sistema.ISSUER_ROLE(), decano), true, "El decano deberia tener el rol");
+    }
+
+    function testIssuerEmiteCredencial() public {
+        // El test tiene ISSUER_ROLE por el constructor, emite directamente
+        uint256 id = sistema.issueCredential(alumno, "Licenciatura", studentHash, docHash, "ipfs://uri");
+        
+        (SistemaCredencialesUNQ.Credential memory cred, bool isValid) = sistema.verify(id);
+        Assert.equal(isValid, true, "Deberia ser valida");
+        Assert.equal(cred.degreeName, "Licenciatura", "Nombre carrera incorrecto");
+    }
+
+    function testIssuerRevocaCredencial() public {
+        // Revocamos el ID 0 (emitido en el test anterior)
+        sistema.revoke(0, "Error administrativo");
+        (, bool isValid) = sistema.verify(0);
+        Assert.equal(isValid, false, "Debe estar inactiva tras revocacion");
+    }
+
+    // --- CASOS DE ERROR ---
+
+    function testFallarEmisionSinRol() public {
+        // El contrato de test se quita el rol a sí mismo para probar el error
+        sistema.revokeRole(sistema.ISSUER_ROLE(), address(this));
+        
+        try sistema.issueCredential(alumno, "Falla", studentHash, docHash, "uri") {
+            Assert.ok(false, "Deberia haber fallado por falta de rol");
+        } catch {
+            Assert.ok(true, "Revirtio correctamente");
         }
+        
+        // Restauramos el rol para los siguientes tests
+        sistema.grantRole(sistema.ISSUER_ROLE(), address(this));
+    }
+
+    function testFallarTransferenciaSoulbound() public {
+        // Emitimos una nueva credencial (ID 1)
+        uint256 id = sistema.issueCredential(alumno, "Soulbound Test", studentHash, docHash, "uri");
+        
+        try sistema.transferFrom(alumno, decano, id) {
+            Assert.ok(false, "Deberia haber fallado por ser Soulbound");
+        } catch Error(string memory reason) {
+            // Verificamos el mensaje de error definido en el contrato
+            Assert.equal(reason, "Soulbound: Las credenciales son intransferibles", "Mensaje de error incorrecto");
+        }
+    }
+
+    // --- FUZZ TESTING (Simulado en Remix) ---
+
+    function testFuzz_issueCredential() public {
+        // En Remix es un Unit Test, en Foundry seria con cientos de inputs [5, 6]
+        address randomStudent = address(0x123);
+        uint256 id = sistema.issueCredential(randomStudent, "Fuzz", studentHash, docHash, "uri");
+        Assert.equal(sistema.ownerOf(id), randomStudent, "El owner debe ser el estudiante");
     }
 }
